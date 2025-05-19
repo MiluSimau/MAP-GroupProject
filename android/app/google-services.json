@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "216584897521",
+    "project_id": "hockeyapp-43c34",
+    "storage_bucket": "hockeyapp-43c34.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:216584897521:android:f6c9df8e7ec385d725ba50",
+        "android_client_info": {
+          "package_name": "com.example.hockey_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "216584897521-tpphhrqv9ia6i7frvdeoem9e95bq0qa6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.hockey_app",
+            "certificate_hash": "273464555bd85ded00f1b254f20012ada082194c"
+          }
+        },
+        {
+          "client_id": "216584897521-fcl5jomdfshj19mfmab2o2tgqm4o7c6n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCigXvwDGMFZVfoOd7t-A8J9aS5V9VIRG8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "216584897521-fcl5jomdfshj19mfmab2o2tgqm4o7c6n.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "216584897521-sh8p06gbsa16k4ddh74ncss59dqob47k.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hockeyApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
