@@ -5,3 +5,5 @@ Tech Stack:- Frontend: Flutter(Dart)
             - Backend: Firebase
 
 Installation Prerequisites: Flutter SDK,Dart plugin,FireBase Dependencies
+
+The Main project is in the local branch
