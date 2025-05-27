@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'teamsPage.dart';
+import 'EventScreen.dart';
+import 'Announcement.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -186,8 +188,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> get _pages => [
         _buildMainHomeContent(),
         TeamsPage(),
-        const Center(child: Text("Calendar Placeholder")),
-        const Center(child: Text("Profile Placeholder")),
+        EventsScreen(),
+        AnnouncementScreen()
       ];
 
   @override
@@ -214,10 +216,10 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: CircleAvatar(
                 backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+                backgroundColor: Colors.transparent,
                 child: user?.photoURL == null
                     ? const Icon(Icons.account_circle, color: Colors.grey)
                     : null,
-                backgroundColor: Colors.transparent,
               ),
             ),
           ),
@@ -244,7 +246,7 @@ bottomNavigationBar: BottomAppBar(
         onPressed: () => _onItemTapped(2),
       ),
       IconButton(
-        icon: Icon(Icons.person, color: _selectedIndex == 3 ? Colors.red : Colors.grey),
+        icon: Icon(Icons.chat_bubble_outline, color: _selectedIndex == 3 ? Colors.red : Colors.grey),
         onPressed: () => _onItemTapped(3),
       ),
     ],

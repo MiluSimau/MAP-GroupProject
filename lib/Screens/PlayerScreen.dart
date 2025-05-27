@@ -1,19 +1,36 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'EditPlayer.dart';
+import 'Transfer.dart';
 
 class PlayerScreen extends StatelessWidget {
+  final String docId;
   final String name;
   final String role;
   final String number;
+  final String portraitBase64;
+  final Map<String, dynamic> playerData;
 
   const PlayerScreen({
+    super.key,
+    required this.docId,
     required this.name,
     required this.role,
     required this.number,
-    Key? key,
-  }) : super(key: key);
+    required this.portraitBase64,
+    required this.playerData,
+  });
 
   @override
   Widget build(BuildContext context) {
+    Uint8List? imageBytes;
+    try {
+      imageBytes = base64Decode(portraitBase64);
+    } catch (e) {
+      print('Error decoding base64: $e');
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -25,10 +42,15 @@ class PlayerScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     height: 270,
-                    child: Image.asset(
-                      'assets/player_image.jpg',
-                      fit: BoxFit.cover,
-                    ),
+                    child: imageBytes != null
+                        ? Image.memory(
+                            imageBytes,
+                            fit: BoxFit.cover,
+                          )
+                        : const Center(
+                            child: Icon(Icons.broken_image,
+                                size: 60, color: Colors.grey),
+                          ),
                   ),
                   Positioned(
                     top: 16,
@@ -95,9 +117,9 @@ class PlayerScreen extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const Text(
-                          "#6", // Consider passing this dynamically too
-                          style: TextStyle(
+                        Text(
+                          "#$number",
+                          style: const TextStyle(
                             color: Colors.red,
                             fontWeight: FontWeight.bold,
                             fontSize: 32,
@@ -115,11 +137,11 @@ class PlayerScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _buildActionButton("View Stats"),
+                    _buildActionButton("View Stats", context),
                     const SizedBox(height: 8),
-                    _buildActionButton("Edit Details"),
+                    _buildActionButton("Edit Details", context),
                     const SizedBox(height: 8),
-                    _buildActionButton("Make Transfer"),
+                    _buildActionButton("Make Transfer", context),
                   ],
                 ),
               ),
@@ -132,7 +154,7 @@ class PlayerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButton(String text) {
+  Widget _buildActionButton(String text, BuildContext context) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton(
@@ -142,7 +164,31 @@ class PlayerScreen extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         onPressed: () {
-          // Add your logic here
+          if (text == "Edit Details") {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EditTeamMemberScreen(
+                  docId: docId,
+                  playerData: playerData,
+                ),
+              ),
+            );
+          }  else if (text == "Make Transfer") {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => TransferPlayerPage(
+        playerId: docId,
+        fromTeamId: playerData['teamId'], // <-- ensure this key exists in playerData
+      ),
+    ),
+  );
+} else {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('$text tapped')),
+  );
+}
         },
         child: Text(
           text,

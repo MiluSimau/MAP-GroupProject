@@ -1,408 +1,297 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-class TeamRegistrationPage extends StatelessWidget {
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+
+class TeamRegistrationPage extends StatefulWidget {
+  const TeamRegistrationPage({super.key});
+
+  @override
+  _TeamRegistrationPageState createState() => _TeamRegistrationPageState();
+}
+
+class _TeamRegistrationPageState extends State<TeamRegistrationPage> {
+  String? selectedGender;
+  String? selectedRegion;
+  String? selectedYear;
+  String? selectedLeague;
+
+  final TextEditingController _teamNameController = TextEditingController();
+
+  final List<String> regions = ['Region 1', 'Region 2', 'Region 3'];
+  final List<String> years = ['2022', '2023', '2024'];
+  final List<String> leagues = ['Division 1', 'Division 2', 'Division 3'];
+
+  bool isLoading = false;
+
+  File? _logoImageFile;
+  String? _logoBase64;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _registerTeam() async {
+    if (_teamNameController.text.trim().isEmpty || _logoBase64 == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Team name and logo are required."),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      await FirebaseFirestore.instance.collection('teams').add({
+        'name': _teamNameController.text.trim(),
+        'logoBase64': _logoBase64!,
+        'gender': selectedGender ?? 'Unspecified',
+        'region': selectedRegion ?? 'Unknown',
+        'yearFounded': selectedYear ?? 'Unknown',
+        'league': selectedLeague ?? 'Unknown',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Team registered successfully!'),
+        backgroundColor: Colors.green,
+      ));
+
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to register team: $e'),
+        backgroundColor: Colors.red,
+      ));
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _pickLogoImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      final tempFile = File(pickedFile.path);
+      final bytes = await tempFile.readAsBytes();
+      final base64String = base64Encode(bytes);
+
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = 'team_logo_${DateTime.now().millisecondsSinceEpoch}.png';
+      final savedImage = await tempFile.copy(path.join(appDir.path, fileName));
+
+      setState(() {
+        _logoImageFile = savedImage;
+        _logoBase64 = base64String;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        extendBodyBehindAppBar: true,
-        appBar: PreferredSize(
-          preferredSize: Size.fromHeight(180),
-          child: AppBar(
-            flexibleSpace: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF8B39F6), Color(0xFFB16CEA)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+    Uint8List? logoBytes = _logoBase64 != null ? base64Decode(_logoBase64!) : null;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: Container(
+            width: 350,
+            margin: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
                 ),
-              ),
-              child: SafeArea(
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(height: 16),
-                    CircleAvatar(
-                      radius: 32,
-                      backgroundColor: Colors.white,
-                      child: Text(
-                        "NHU",
-                        style: TextStyle(
-                          color: Color(0xFF8B39F6),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 28,
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: IconButton(
+                        icon: Icon(Icons.arrow_back, color: Colors.red, size: 28),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                        constraints: BoxConstraints(),
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Center(
+                      child: Column(
+                        children: [
+                          Text("Logo", style: TextStyle(fontSize: 14)),
+                          SizedBox(height: 6),
+                          GestureDetector(
+                            onTap: _pickLogoImage,
+                            child: Container(
+                              width: 70,
+                              height: 70,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
+                                image: logoBytes != null
+                                    ? DecorationImage(
+                                        image: MemoryImage(logoBytes),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
+                              ),
+                              child: logoBytes == null
+                                  ? Icon(Icons.add_photo_alternate,
+                                      size: 32, color: Colors.grey[400])
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 18),
+                    Text("Gender", style: TextStyle(fontSize: 14), textAlign: TextAlign.center),
+                    SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _genderButton('Men', Icons.man, selectedGender == 'Men', () {
+                          setState(() => selectedGender = 'Men');
+                        }),
+                        SizedBox(width: 16),
+                        _genderButton('Women', Icons.woman, selectedGender == 'Women', () {
+                          setState(() => selectedGender = 'Women');
+                        }),
+                      ],
+                    ),
+                    SizedBox(height: 18),
+                    _buildTextField("Team Name"),
+                    SizedBox(height: 12),
+                    _buildDropdown("Region", regions, selectedRegion, (value) {
+                      setState(() => selectedRegion = value);
+                    }),
+                    SizedBox(height: 12),
+                    _buildDropdown("Year Founded", years, selectedYear, (value) {
+                      setState(() => selectedYear = value);
+                    }),
+                    SizedBox(height: 12),
+                    _buildDropdown("League/ Division", leagues, selectedLeague, (value) {
+                      setState(() => selectedLeague = value);
+                    }),
+                    SizedBox(height: 28),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: BorderSide(color: Colors.red),
+                              padding: EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('Cancel', style: TextStyle(fontSize: 16)),
+                          ),
                         ),
-                      ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              backgroundColor: Colors.red,
+                              padding: EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            onPressed: isLoading ? null : _registerTeam,
+                            child: isLoading
+                                ? CircularProgressIndicator(color: Colors.white)
+                                : Text('Register', style: TextStyle(fontSize: 16)),
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 10),
-                    Text(
-                      "Namibia Hockey Union",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 22,
-                      ),
-                    ),
-                    Text(
-                      "Connecting the hockey community",
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
+                    SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Icon(Icons.home_outlined, color: Colors.grey[400], size: 28),
+                        Icon(Icons.groups, color: Colors.red, size: 28),
+                        Icon(Icons.calendar_today_outlined, color: Colors.grey[400], size: 28),
+                        Icon(Icons.person_outline, color: Colors.grey[400], size: 28),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            bottom: TabBar(
-              indicatorColor: Colors.white,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white70,
-              tabs: [
-                Tab(text: "Home"),
-                Tab(text: "Events"),
-                Tab(text: "Teams"),
-                Tab(text: "Register"),
-              ],
-            ),
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            HomeContent(),
-            EventsTab(), // <-- MODIFIED: Events tab content
-            Center(child: Text("Teams")),
-            Center(child: Text("Register")),
-          ],
-        ),
-        bottomNavigationBar: CustomBottomNavBar(),
-      ),
-    );
-  }
-}
-
-class HomeContent extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(top: 200, left: 12, right: 12),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Upcoming Events",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: Color(0xFF4B2067),
-                ),
-              ),
-              SizedBox(height: 16),
-              EventItem(
-                date: "15\nJUN",
-                title: "National Championship",
-                location: "Windhoek Hockey Stadium",
-                time: "9:00 AM - 5:00 PM",
-              ),
-              Divider(),
-              EventItem(
-                date: "22\nJUN",
-                title: "Junior Tournament",
-                location: "Coastal Hockey Club",
-                time: "10:00 AM - 4:00 PM",
-              ),
-              SizedBox(height: 16),
-              Center(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF8B39F6),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  ),
-                  onPressed: () {},
-                  child: Text("View All Events"),
-                ),
-              ),
-            ],
           ),
         ),
       ),
     );
   }
-}
 
-class EventItem extends StatelessWidget {
-  final String date, title, location, time;
-
-  EventItem({
-    required this.date,
-    required this.title,
-    required this.location,
-    required this.time,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 48,
-          height: 48,
+  Widget _genderButton(String label, IconData icon, bool selected, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: Color(0xFF8B39F6),
-            borderRadius: BorderRadius.circular(12),
+            color: selected ? const Color.fromARGB(255, 66, 8, 4) : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
           ),
-          alignment: Alignment.center,
-          child: Text(
-            date,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
-          ),
-        ),
-        SizedBox(width: 16),
-        Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Color(0xFF4B2067),
-                ),
-              ),
-              Text(
-                location,
-                style: TextStyle(
-                  color: Colors.grey[700],
-                  fontSize: 13,
-                ),
-              ),
-              Text(
-                time,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ----------------- NEW EVENTS TAB WIDGETS BELOW -----------------
-
-class EventsTab extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.only(top: 24, left: 12, right: 12),
-      child: Card(
-        color: Color(0xFFF8F6FC),
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "June 2023 Events",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: Color(0xFF4B2067),
-                ),
-              ),
-              SizedBox(height: 16),
-              EventCard(
-                date: "15\nJUN",
-                title: "National Championship",
-                location: "Windhoek Hockey Stadium",
-                time: "9:00 AM - 5:00 PM",
-              ),
-              Divider(height: 32, color: Color(0xFFE5D8F9)),
-              EventCard(
-                date: "22\nJUN",
-                title: "Junior Tournament",
-                location: "Coastal Hockey Club",
-                time: "10:00 AM - 4:00 PM",
-              ),
+              Icon(icon, color: selected ? Colors.white : Colors.grey[600], size: 28),
+              SizedBox(height: 4),
+              Text(label, style: TextStyle(color: selected ? Colors.white : Colors.grey[700], fontSize: 15)),
             ],
           ),
         ),
       ),
     );
   }
-}
 
-class EventCard extends StatelessWidget {
-  final String date, title, location, time;
-
-  EventCard({
-    required this.date,
-    required this.title,
-    required this.location,
-    required this.time,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Date Box
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: Color(0xFF8B39F6),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            date,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
-          ),
+  Widget _buildTextField(String hint) {
+    return TextField(
+      controller: _teamNameController,
+      decoration: InputDecoration(
+        hintText: hint,
+        filled: true,
+        fillColor: Colors.grey[100],
+        contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
         ),
-        SizedBox(width: 16),
-        // Event Details
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Color(0xFF4B2067),
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                location,
-                style: TextStyle(
-                  color: Colors.grey[700],
-                  fontSize: 13,
-                ),
-              ),
-              Text(
-                time,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
-              ),
-              SizedBox(height: 8),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF8B39F6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  elevation: 0,
-                ),
-                onPressed: () {
-                  // Add registration logic here
-                },
-                child: Text("Register"),
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
-}
 
-// ----------------- BOTTOM NAVIGATION BAR -----------------
-
-class CustomBottomNavBar extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: 0,
-      selectedItemColor: Color(0xFF8B39F6),
-      unselectedItemColor: Colors.grey,
-      items: [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          label: "Home",
+  Widget _buildDropdown(String hint, List<String> items, String? value, ValueChanged<String?> onChanged) {
+    return DropdownButtonFormField<String>(
+      decoration: InputDecoration(
+        hintText: hint,
+        filled: true,
+        fillColor: Colors.grey[100],
+        contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.event),
-          label: "Events",
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.group),
-          label: "Teams",
-        ),
-        BottomNavigationBarItem(
-          icon: Stack(
-            children: [
-              Icon(Icons.notifications),
-              Positioned(
-                right: 0,
-                top: 0,
-                child: Container(
-                  padding: EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.amber,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  constraints: BoxConstraints(
-                    minWidth: 16,
-                    minHeight: 16,
-                  ),
-                  child: Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              )
-            ],
-          ),
-          label: "Notifications",
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: "Profile",
-        ),
-      ],
-      type: BottomNavigationBarType.fixed,
+      ),
+      value: value,
+      items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+      onChanged: onChanged,
+      icon: Icon(Icons.keyboard_arrow_down),
     );
   }
 }

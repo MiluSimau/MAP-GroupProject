@@ -1,248 +1,323 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:table_calendar/table_calendar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
 
-void main() {
-  runApp(MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: EventsScreen(),
-  ));
+class EditTeamMemberScreen extends StatefulWidget {
+  final String docId;
+  final Map<String, dynamic> playerData;
+
+    const EditTeamMemberScreen({
+    Key? key,
+    required this.docId,
+    required this.playerData,
+  }) : super(key: key);
+
+
+  @override
+  _EditTeamMemberScreenState createState() => _EditTeamMemberScreenState();
 }
 
-class EventsScreen extends StatelessWidget {
+class _EditTeamMemberScreenState extends State<EditTeamMemberScreen> {
+  final _formKey = GlobalKey<FormState>();
+  late String _firstName;
+  late String _lastName;
+  late String _age;
+  late String _position;
+  late String _jerseyNumber;
+  String? _imageUrl;
+  File? _selectedImage;
+
+  @override
+  void initState() {
+    super.initState();
+    _firstName = widget.playerData['firstName'] ?? '';
+    _lastName = widget.playerData['lastName'] ?? '';
+    _age = widget.playerData['age'] ?? '';
+    _position = widget.playerData['position'] ?? '';
+    _jerseyNumber = widget.playerData['jerseyNumber'] ?? '';
+    _imageUrl = widget.playerData['imageUrl'];
+  }
+
+  Future<void> _pickImage() async {
+    final pickedImage =
+        await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (pickedImage != null) {
+      setState(() {
+        _selectedImage = File(pickedImage.path);
+      });
+    }
+  }
+
+  Future<String?> _uploadImage(File image) async {
+    try {
+      String fileName = path.basename(image.path);
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('player_images')
+          .child('${widget.docId}_$fileName');
+
+      await ref.putFile(image);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      print('Image upload error: $e');
+      return null;
+    }
+  }
+
+  Future<void> _updatePlayer() async {
+    try {
+      String? imageUrl = _imageUrl;
+
+      if (_selectedImage != null) {
+        imageUrl = await _uploadImage(_selectedImage!);
+      }
+
+      await FirebaseFirestore.instance
+          .collection('players')
+          .doc(widget.docId)
+          .update({
+        'firstName': _firstName,
+        'lastName': _lastName,
+        'age': _age,
+        'position': _position,
+        'jerseyNumber': _jerseyNumber,
+        'imageUrl': imageUrl,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Player updated successfully')),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      print('Error updating player: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update player')),
+      );
+    }
+  }
+
+  Future<void> _deletePlayer() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('players')
+          .doc(widget.docId)
+          .delete();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Player deleted')),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      print('Error deleting player: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete player')),
+      );
+    }
+  }
+
+  Widget _buildPlayerPortrait() {
+    return GestureDetector(
+      onTap: _pickImage,
+      child: Container(
+        width: 100,
+        height: 100,
+        decoration: BoxDecoration(
+          color: Color(0xFFF6F6F6),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: _selectedImage != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.file(_selectedImage!, fit: BoxFit.cover),
+              )
+            : _imageUrl != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(_imageUrl!, fit: BoxFit.cover),
+                  )
+                : Center(
+                    child: Icon(
+                      Icons.add_photo_alternate_outlined,
+                      color: Colors.grey[400],
+                      size: 40,
+                    ),
+                  ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Color(0xFFF8F8F8),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // AppBar substitute
-              Container(
-                alignment: Alignment.centerLeft,
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(6),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Container(
+              width: 370,
+              padding: EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 24,
+                    offset: Offset(0, 8),
                   ),
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  child: Text(
-                    "Events Screen",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
+                ],
               ),
-              // Main Card
-              Container(
-                margin: EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Logo
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
-                      child: Image.asset(
-                        'assets/namibia_hockey_logo.png', // Replace with your logo
-                        height: 60,
-                        fit: BoxFit.contain,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: CircleAvatar(
+                      backgroundColor: Color(0xFFE53935),
+                      radius: 24,
+                      child: IconButton(
+                        icon: Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
                     ),
-                    SizedBox(height: 6),
-                    // Calendar Header
-                    Text(
-                      "Calender",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 22,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    SizedBox(height: 6),
-                    // Calendar Widget
-                    TableCalendar(
-                      firstDay: DateTime.utc(2020, 1, 1),
-                      lastDay: DateTime.utc(2030, 12, 31),
-                      focusedDay: DateTime.now(),
-                      headerStyle: HeaderStyle(
-                        formatButtonVisible: false,
-                        titleCentered: true,
-                        leftChevronIcon: Icon(Icons.chevron_left, color: Colors.red),
-                        rightChevronIcon: Icon(Icons.chevron_right, color: Colors.red),
-                        titleTextStyle: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      calendarStyle: CalendarStyle(
-                        todayDecoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        selectedDecoration: BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        weekendTextStyle: TextStyle(color: Colors.black87),
-                        defaultTextStyle: TextStyle(color: Colors.black87),
-                        outsideTextStyle: TextStyle(color: Colors.grey[400]),
-                      ),
-                      daysOfWeekStyle: DaysOfWeekStyle(
-                        weekdayStyle: TextStyle(fontWeight: FontWeight.w600),
-                        weekendStyle: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      calendarFormat: CalendarFormat.month,
-                      availableGestures: AvailableGestures.none,
-                    ),
-                    SizedBox(height: 16),
-                    // Events Header
-                    Text(
-                      "Events",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    // Event Cards
-                    EventCard(
-                      image: 'assets/fnb_logo.png', // Replace with your asset
-                      title: "FNB Classic Clash",
-                      date: "3-7 Jun",
-                      location: "Windhoek",
-                    ),
-                    SizedBox(height: 10),
-                    EventCard(
-                      image: 'assets/nationals_logo.png', // Replace with your asset
-                      title: "Ladies 7-a-side Tournament",
-                      date: "8-10 Jun",
-                      location: "Windhoek",
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 80), // Space for FAB
-            ],
-          ),
-        ),
-      ),
-      // Floating Action Button
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.red,
-        child: Icon(Icons.add, size: 32),
-        onPressed: () {
-          // Add event action
-        },
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      // Bottom Navigation Bar
-      bottomNavigationBar: _buildBottomNavBar(),
-    );
-  }
-
-  Widget _buildBottomNavBar() {
-    return BottomAppBar(
-      shape: CircularNotchedRectangle(),
-      notchMargin: 8,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 6),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Icon(Icons.home_outlined, color: Colors.grey[500], size: 30),
-            Icon(Icons.group_outlined, color: Colors.grey[500], size: 30),
-            SizedBox(width: 40), // space for FAB
-            Icon(Icons.calendar_today, color: Colors.red, size: 30),
-            Icon(Icons.chat_bubble_outline, color: Colors.grey[500], size: 30),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class EventCard extends StatelessWidget {
-  final String image;
-  final String title;
-  final String date;
-  final String location;
-
-  const EventCard({
-    required this.image,
-    required this.title,
-    required this.date,
-    required this.location,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          // Event Image
-          CircleAvatar(
-            backgroundImage: AssetImage(image),
-            radius: 24,
-          ),
-          SizedBox(width: 12),
-          // Event Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
                   ),
-                ),
-                SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
-                    SizedBox(width: 4),
-                    Text(
-                      date,
-                      style: TextStyle(color: Colors.grey[700]),
+                  SizedBox(height: 8),
+                  Text(
+                    'Player Portrait',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                  ),
+                  SizedBox(height: 12),
+                  _buildPlayerPortrait(),
+                  SizedBox(height: 24),
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          initialValue: _firstName,
+                          decoration: _inputDecoration('First Name'),
+                          onSaved: (value) => _firstName = value!,
+                        ),
+                        SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _lastName,
+                          decoration: _inputDecoration('Last Name'),
+                          onSaved: (value) => _lastName = value!,
+                        ),
+                        SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _age,
+                          decoration: _inputDecoration('Age'),
+                          keyboardType: TextInputType.number,
+                          onSaved: (value) => _age = value!,
+                        ),
+                        SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          decoration: _inputDecoration('Position'),
+                          value: _position.isNotEmpty ? _position : null,
+                          items: ['Forward', 'Midfielder', 'Defender', 'Goalkeeper']
+                              .map((pos) => DropdownMenuItem(
+                                    value: pos,
+                                    child: Text(pos),
+                                  ))
+                              .toList(),
+                          onChanged: (value) =>
+                              setState(() => _position = value!),
+                        ),
+                        SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _jerseyNumber,
+                          decoration: _inputDecoration('Jersey Number'),
+                          keyboardType: TextInputType.number,
+                          onSaved: (value) => _jerseyNumber = value!,
+                        ),
+                        SizedBox(height: 32),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                      color: Color(0xFFE53935), width: 2),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                  padding: EdgeInsets.symmetric(vertical: 18),
+                                ),
+                                onPressed: _deletePlayer,
+                                child: Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                      color: Color(0xFFE53935),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(0xFFE53935),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                  padding: EdgeInsets.symmetric(vertical: 18),
+                                ),
+                                onPressed: () {
+                                  if (_formKey.currentState!.validate()) {
+                                    _formKey.currentState!.save();
+                                    _updatePlayer();
+                                  }
+                                },
+                                child: Text(
+                                  'Save',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Icon(Icons.home_outlined,
+                                color: Colors.grey[400], size: 32),
+                            Icon(Icons.groups,
+                                color: Color(0xFFE53935), size: 32),
+                            Icon(Icons.calendar_today_outlined,
+                                color: Colors.grey[400], size: 32),
+                            Icon(Icons.chat_bubble_outline,
+                                color: Colors.grey[400], size: 32),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                      ],
                     ),
-                    SizedBox(width: 8),
-                    Text(
-                      location,
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
-          Icon(Icons.chevron_right, color: Colors.grey[500]),
-        ],
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hintText) {
+    return InputDecoration(
+      hintText: hintText,
+      filled: true,
+      fillColor: Color(0xFFF6F6F6),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide.none,
       ),
     );
   }

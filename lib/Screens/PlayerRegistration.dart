@@ -1,13 +1,85 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 
 class PlayerRegistrationPage extends StatefulWidget {
+  final String teamId;
+
+  const PlayerRegistrationPage({required this.teamId, super.key});
+
   @override
   _PlayerRegistrationPageState createState() => _PlayerRegistrationPageState();
 }
 
 class _PlayerRegistrationPageState extends State<PlayerRegistrationPage> {
   final _formKey = GlobalKey<FormState>();
+  final _picker = ImagePicker();
+
+  File? _selectedImage;
+  bool _isUploading = false;
   String? _selectedPosition;
+
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _ageController = TextEditingController();
+  final _jerseyNumberController = TextEditingController();
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _ageController.dispose();
+    _jerseyNumberController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() => _selectedImage = File(picked.path));
+    }
+  }
+
+  Future<void> _registerPlayer() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isUploading = true);
+
+    try {
+      String? imageBase64;
+      if (_selectedImage != null) {
+        final bytes = await _selectedImage!.readAsBytes();
+        imageBase64 = base64Encode(bytes);
+      }
+
+await FirebaseFirestore.instance
+    .collection('teams')
+    .doc(widget.teamId)
+    .collection('members')
+    .add({
+  'firstName': _firstNameController.text.trim(),
+  'lastName': _lastNameController.text.trim(),
+  'age': int.parse(_ageController.text.trim()),
+  'jerseyNumber': int.parse(_jerseyNumberController.text.trim()),
+  'position': _selectedPosition,
+  'portraitBase64': imageBase64,
+  'registeredAt': FieldValue.serverTimestamp(),
+});
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Player registered successfully!')),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() => _isUploading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,12 +89,12 @@ class _PlayerRegistrationPageState extends State<PlayerRegistrationPage> {
         child: Center(
           child: SingleChildScrollView(
             child: Container(
-              margin: EdgeInsets.all(16),
-              padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
+                boxShadow: const [
                   BoxShadow(
                     color: Colors.black12,
                     blurRadius: 8,
@@ -33,15 +105,14 @@ class _PlayerRegistrationPageState extends State<PlayerRegistrationPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // App Bar Row
                   Row(
                     children: [
                       IconButton(
-                        icon: Icon(Icons.arrow_back, color: Colors.red, size: 28),
+                        icon: const Icon(Icons.arrow_back, color: Colors.red, size: 28),
                         onPressed: () => Navigator.pop(context),
                       ),
-                      SizedBox(width: 8),
-                      Text(
+                      const SizedBox(width: 8),
+                      const Text(
                         'Player Portrait',
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
@@ -51,70 +122,99 @@ class _PlayerRegistrationPageState extends State<PlayerRegistrationPage> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 12),
-                  // Portrait Placeholder
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 12),
+
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                        image: _selectedImage != null
+                            ? DecorationImage(
+                                image: FileImage(_selectedImage!),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      child: _selectedImage == null
+                          ? Icon(Icons.camera_alt, size: 40, color: Colors.grey[500])
+                          : null,
                     ),
-                    child: Icon(Icons.person, size: 48, color: Colors.grey[400]),
                   ),
-                  SizedBox(height: 24),
-                  // Form Fields
+                  const SizedBox(height: 24),
+
                   Form(
                     key: _formKey,
                     child: Column(
                       children: [
-                        _buildTextField('First Name'),
-                        SizedBox(height: 16),
-                        _buildTextField('Last Name'),
-                        SizedBox(height: 16),
-                        _buildTextField('Age', keyboardType: TextInputType.number),
-                        SizedBox(height: 16),
+                        _buildTextField('First Name', controller: _firstNameController),
+                        const SizedBox(height: 16),
+                        _buildTextField('Last Name', controller: _lastNameController),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          'Age',
+                          controller: _ageController,
+                          keyboardType: TextInputType.number,
+                          validator: (val) =>
+                              val == null || val.isEmpty || int.tryParse(val) == null
+                                  ? 'Enter valid age'
+                                  : null,
+                        ),
+                        const SizedBox(height: 16),
                         _buildDropdownField(),
-                        SizedBox(height: 16),
-                        _buildTextField('Jersey Number', keyboardType: TextInputType.number),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          'Jersey Number',
+                          controller: _jerseyNumberController,
+                          keyboardType: TextInputType.number,
+                          validator: (val) =>
+                              val == null || val.isEmpty || int.tryParse(val) == null
+                                  ? 'Enter valid jersey number'
+                                  : null,
+                        ),
                       ],
                     ),
                   ),
-                  SizedBox(height: 24),
-                  // Buttons Row
+                  const SizedBox(height: 24),
+
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton(
                           style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: Colors.red),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: EdgeInsets.symmetric(vertical: 14),
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          onPressed: () {},
-                          child: Text(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text(
                             'Cancel',
                             style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          onPressed: () {},
-                          child: Text(
-                            'Register',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                          ),
+                          onPressed: _isUploading ? null : _registerPlayer,
+                          child: _isUploading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text(
+                                  'Register',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                ),
                         ),
                       ),
                     ],
@@ -125,47 +225,30 @@ class _PlayerRegistrationPageState extends State<PlayerRegistrationPage> {
           ),
         ),
       ),
-      // Bottom Navigation Bar
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.red,
-        unselectedItemColor: Colors.grey[400],
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
-          BottomNavigationBarItem(
-            icon: Container(
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              padding: EdgeInsets.all(8),
-              child: Icon(Icons.groups, color: Colors.red),
-            ),
-            label: '',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: ''),
-        ],
-      ),
     );
   }
 
-  Widget _buildTextField(String hint, {TextInputType keyboardType = TextInputType.text}) {
+  Widget _buildTextField(
+    String hint, {
+    required TextEditingController controller,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
     return TextFormField(
+      controller: controller,
       keyboardType: keyboardType,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
         fillColor: Colors.grey[100],
-        contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
       ),
+      validator: validator ??
+          (value) => value == null || value.trim().isEmpty ? 'Please enter $hint' : null,
     );
   }
 
@@ -176,16 +259,18 @@ class _PlayerRegistrationPageState extends State<PlayerRegistrationPage> {
         hintText: 'Position',
         filled: true,
         fillColor: Colors.grey[100],
-        contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
       ),
-      items: ['Forward', 'Midfielder', 'Defender', 'Goalkeeper']
+      items: ['Forward', 'Midfielder', 'Defender', 'Goalkeeper', 'Coach']
           .map((pos) => DropdownMenuItem(value: pos, child: Text(pos)))
           .toList(),
       onChanged: (val) => setState(() => _selectedPosition = val),
+      validator: (val) => val == null ? 'Please select a position' : null,
     );
   }
 }
+ 
