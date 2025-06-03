@@ -5,7 +5,7 @@ class TransferPlayerPage extends StatefulWidget {
   final String playerId;
   final String fromTeamId;
 
-  TransferPlayerPage({required this.playerId, required this.fromTeamId});
+  const TransferPlayerPage({super.key, required this.playerId, required this.fromTeamId});
 
   @override
   State<TransferPlayerPage> createState() => _TransferPlayerPageState();

@@ -145,19 +145,20 @@ final data = snapshot.docs.map((doc) {
 
                                   return GestureDetector(
 onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => PlayerScreen(
-        docId: member['id'], // ✅ Pass document ID
-        name: name,
-        role: role,
-        number: number,
-        portraitBase64: member['portraitBase64'] ?? '',
-        playerData: member, // ✅ Pass the entire player data map
-      ),
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => PlayerScreen(
+      teamId: widget.teamId, // ✅ Pass the teamId
+      docId: member['id'],
+      name: name,
+      role: role,
+      number: number,
+      portraitBase64: member['portraitBase64'] ?? '',
+      playerData: member,
     ),
-  );
+  ),
+);
 },
                                     child: _MemberCard(
                                       name: name,
@@ -192,7 +193,7 @@ onTap: () {
         child: Icon(Icons.add, size: 36, color: Colors.white),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: _CustomBottomNavBar(),
+
     );
   }
 }
@@ -252,26 +253,3 @@ class _MemberCard extends StatelessWidget {
   }
 }
 
-class _CustomBottomNavBar extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return BottomAppBar(
-      shape: CircularNotchedRectangle(),
-      notchMargin: 8,
-      child: Container(
-        height: 60,
-        padding: EdgeInsets.symmetric(horizontal: 30),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Icon(Icons.home_outlined, color: Colors.grey[400], size: 30),
-            Icon(Icons.groups, color: Colors.red, size: 30),
-            SizedBox(width: 40), // space for FAB
-            Icon(Icons.calendar_today_outlined, color: Colors.grey[400], size: 28),
-            Icon(Icons.person_outline, color: Colors.grey[400], size: 30),
-          ],
-        ),
-      ),
-    );
-  }
-}

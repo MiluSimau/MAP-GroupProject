@@ -3,9 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
-import '../models/event_model.dart';
-import 'package:image_picker/image_picker.dart';
-
 
 class EventCreationScreen extends StatefulWidget {
   const EventCreationScreen({super.key});
@@ -24,7 +21,23 @@ class _EventCreationScreenState extends State<EventCreationScreen> {
   TimeOfDay? _endTime;
   File? _pickedImage;
 
-  // Pick Date
+  List<String> _teams = [];
+  String? _selectedTeamA;
+  String? _selectedTeamB;
+
+  Future<void> _loadTeams() async {
+    final snapshot = await FirebaseFirestore.instance.collection('teams').get();
+    setState(() {
+      _teams = snapshot.docs.map((doc) => doc['name'].toString()).toList();
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTeams();
+  }
+
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -40,7 +53,6 @@ class _EventCreationScreenState extends State<EventCreationScreen> {
     }
   }
 
-  // Pick Time
   Future<void> _pickTime(bool isStart) async {
     final picked = await showTimePicker(
       context: context,
@@ -57,7 +69,6 @@ class _EventCreationScreenState extends State<EventCreationScreen> {
     }
   }
 
-  // Pick Image
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -68,7 +79,6 @@ class _EventCreationScreenState extends State<EventCreationScreen> {
     }
   }
 
-  // Clear form
   void _clearForm() {
     _formKey.currentState?.reset();
     _eventNameController.clear();
@@ -78,48 +88,60 @@ class _EventCreationScreenState extends State<EventCreationScreen> {
       _startTime = null;
       _endTime = null;
       _pickedImage = null;
+      _selectedTeamA = null;
+      _selectedTeamB = null;
     });
   }
 
-  // Create Event
-void _createEvent() async {
-  if (_formKey.currentState!.validate()) {
-    if (_selectedDate == null || _startTime == null || _endTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please select date and time")),
-      );
-      return;
-    }
-
-    try {
-      String? base64Image;
-      if (_pickedImage != null) {
-        List<int> imageBytes = await _pickedImage!.readAsBytes();
-        base64Image = base64Encode(imageBytes);
+  void _createEvent() async {
+    if (_formKey.currentState!.validate()) {
+      if (_selectedDate == null || _startTime == null || _endTime == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Please select date and time")),
+        );
+        return;
       }
 
-      await FirebaseFirestore.instance.collection('events').add({
-        'name': _eventNameController.text,
-        'description': _descriptionController.text,
-        'date': _selectedDate!.toIso8601String(),
-        'startTime': _startTime!.format(context),
-        'endTime': _endTime!.format(context),
-        'timestamp': FieldValue.serverTimestamp(),
-        'image': base64Image ?? "", // Store Base64 string (or empty string)
-      });
+      if (_selectedTeamA == null ||
+          _selectedTeamB == null ||
+          _selectedTeamA == _selectedTeamB) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Please select two different teams")),
+        );
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Event Created Successfully!")),
-      );
+      try {
+        String? base64Image;
+        if (_pickedImage != null) {
+          List<int> imageBytes = await _pickedImage!.readAsBytes();
+          base64Image = base64Encode(imageBytes);
+        }
 
-      _clearForm();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to create event: $e")),
-      );
+        await FirebaseFirestore.instance.collection('events').add({
+          'name': _eventNameController.text,
+          'description': _descriptionController.text,
+          'date': _selectedDate!.toIso8601String(),
+          'startTime': _startTime!.format(context),
+          'endTime': _endTime!.format(context),
+          'timestamp': FieldValue.serverTimestamp(),
+          'image': base64Image ?? "",
+          'teamA': _selectedTeamA,
+          'teamB': _selectedTeamB,
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Event Created Successfully!")),
+        );
+
+        _clearForm();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to create event: $e")),
+        );
+      }
     }
   }
-}
 
   @override
   void dispose() {
@@ -140,7 +162,7 @@ void _createEvent() async {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2))],
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
             ),
             child: Form(
               key: _formKey,
@@ -178,7 +200,6 @@ void _createEvent() async {
                               : "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}",
                           suffixIcon: Icon(Icons.calendar_today),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16),
                         ),
                       ),
                     ),
@@ -194,7 +215,6 @@ void _createEvent() async {
                               hintText: _startTime == null ? "Start Time" : _startTime!.format(context),
                               suffixIcon: Icon(Icons.access_time),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16),
                             ),
                           ),
                         ),
@@ -210,9 +230,48 @@ void _createEvent() async {
                               hintText: _endTime == null ? "End Time" : _endTime!.format(context),
                               suffixIcon: Icon(Icons.access_time),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16),
                             ),
                           ),
+                        ),
+                      ),
+                    ),
+                  ]),
+                  SizedBox(height: 16),
+                  Text("Matchup", style: TextStyle(fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedTeamA,
+                        hint: Text("Select Team A"),
+                        items: _teams
+                            .map((team) => DropdownMenuItem(value: team, child: Text(team)))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedTeamA = value;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedTeamB,
+                        hint: Text("Select Team B"),
+                        items: _teams
+                            .map((team) => DropdownMenuItem(value: team, child: Text(team)))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedTeamB = value;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ),
@@ -272,57 +331,54 @@ void _createEvent() async {
                       ),
                     ),
                   ]),
-                  SizedBox(height: 8),
                   SizedBox(height: 16),
-Text("Recent Events", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-SizedBox(height: 8),
-SizedBox(
-  height: 150,
-  child: StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('events')
-        .orderBy('timestamp', descending: true)
-        .snapshots(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return Center(child: CircularProgressIndicator());
-      }
-      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-        return Center(child: Text("No events yet"));
-      }
+                  Text("Recent Events", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  SizedBox(
+                    height: 150,
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('events')
+                          .orderBy('timestamp', descending: true)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        }
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return Center(child: Text("No events yet"));
+                        }
 
-      final docs = snapshot.data!.docs;
-      return ListView.builder(
-        itemCount: docs.length,
-        itemBuilder: (context, index) {
-          final event = docs[index].data() as Map<String, dynamic>;
-return ListTile(
-  contentPadding: EdgeInsets.zero,
-  leading: event['image'] != null && event['image'] != ""
-      ? Image.memory(
-          base64Decode(event['image']),
-          width: 50,
-          height: 50,
-          fit: BoxFit.cover,
-        )
-      : Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
-  title: Text(event['name'] ?? "Unnamed"),
-  subtitle: Text(event['description'] ?? ""),
-  trailing: Text(event['startTime'] ?? ""),
-);
-        },
-      );
-    },
-  ),
-),
-SizedBox(height: 16),
+                        final docs = snapshot.data!.docs;
+                        return ListView.builder(
+                          itemCount: docs.length,
+                          itemBuilder: (context, index) {
+                            final event = docs[index].data() as Map<String, dynamic>;
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: event['image'] != null && event['image'] != ""
+                                  ? Image.memory(
+                                      base64Decode(event['image']),
+                                      width: 50,
+                                      height: 50,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+                              title: Text("${event['teamA'] ?? 'Team A'} vs ${event['teamB'] ?? 'Team B'}"),
+                              subtitle: Text(event['description'] ?? ""),
+                              trailing: Text(event['startTime'] ?? ""),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
                 ]),
               ),
             ),
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 

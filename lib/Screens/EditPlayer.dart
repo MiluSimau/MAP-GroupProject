@@ -1,15 +1,20 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class EditTeamMemberScreen extends StatefulWidget {
-    final String docId;
+  final String docId;
+  final String teamId;
   final Map<String, dynamic> playerData;
 
   const EditTeamMemberScreen({
     super.key,
     required this.docId,
+    required this.teamId,
     required this.playerData,
   });
+
   @override
   _EditTeamMemberScreenState createState() => _EditTeamMemberScreenState();
 }
@@ -21,13 +26,49 @@ class _EditTeamMemberScreenState extends State<EditTeamMemberScreen> {
   String? _age;
   String? _position;
   String? _jerseyNumber;
+  String? _base64Image;
+  final ImagePicker _picker = ImagePicker();
 
-  // Dummy image picker logic (replace with actual image picker)
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        _base64Image = base64Encode(bytes);
+      });
+    }
+  }
+
   Widget _buildPlayerPortrait() {
+    Widget imageWidget;
+    if (_base64Image != null) {
+      imageWidget = Image.memory(
+        base64Decode(_base64Image!),
+        fit: BoxFit.cover,
+      );
+    } else if (widget.playerData['portraitBase64'] != null) {
+      try {
+        imageWidget = Image.memory(
+          base64Decode(widget.playerData['portraitBase64']),
+          fit: BoxFit.cover,
+        );
+      } catch (e) {
+        imageWidget = Icon(
+          Icons.add_photo_alternate_outlined,
+          color: Colors.grey[400],
+          size: 40,
+        );
+      }
+    } else {
+      imageWidget = Icon(
+        Icons.add_photo_alternate_outlined,
+        color: Colors.grey[400],
+        size: 40,
+      );
+    }
+
     return GestureDetector(
-      onTap: () {
-        // TODO: Implement image picker logic
-      },
+      onTap: _pickImage,
       child: Container(
         width: 100,
         height: 100,
@@ -35,12 +76,9 @@ class _EditTeamMemberScreenState extends State<EditTeamMemberScreen> {
           color: Color(0xFFF6F6F6),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Center(
-          child: Icon(
-            Icons.add_photo_alternate_outlined,
-            color: Colors.grey[400],
-            size: 40,
-          ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: imageWidget,
         ),
       ),
     );
@@ -70,7 +108,6 @@ class _EditTeamMemberScreenState extends State<EditTeamMemberScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Back Button
                   Align(
                     alignment: Alignment.centerLeft,
                     child: CircleAvatar(
@@ -85,7 +122,6 @@ class _EditTeamMemberScreenState extends State<EditTeamMemberScreen> {
                     ),
                   ),
                   SizedBox(height: 8),
-                  // Title
                   Text(
                     'Player Portrait',
                     style: TextStyle(
@@ -94,68 +130,34 @@ class _EditTeamMemberScreenState extends State<EditTeamMemberScreen> {
                     ),
                   ),
                   SizedBox(height: 12),
-                  // Portrait
                   _buildPlayerPortrait(),
                   SizedBox(height: 24),
-                  // Form
                   Form(
                     key: _formKey,
                     child: Column(
                       children: [
-                        // First Name
                         TextFormField(
-                          decoration: InputDecoration(
-                            hintText: 'First Name',
-                            filled: true,
-                            fillColor: Color(0xFFF6F6F6),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
+                          initialValue: widget.playerData['firstName'],
+                          decoration: _inputDecoration('First Name'),
                           onSaved: (value) => _firstName = value,
                         ),
                         SizedBox(height: 16),
-                        // Last Name
                         TextFormField(
-                          decoration: InputDecoration(
-                            hintText: 'Last Name',
-                            filled: true,
-                            fillColor: Color(0xFFF6F6F6),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
+                          initialValue: widget.playerData['lastName'],
+                          decoration: _inputDecoration('Last Name'),
                           onSaved: (value) => _lastName = value,
                         ),
                         SizedBox(height: 16),
-                        // Age
                         TextFormField(
-                          decoration: InputDecoration(
-                            hintText: 'Age',
-                            filled: true,
-                            fillColor: Color(0xFFF6F6F6),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
+                          initialValue:
+                              widget.playerData['age']?.toString() ?? '',
+                          decoration: _inputDecoration('Age'),
                           keyboardType: TextInputType.number,
                           onSaved: (value) => _age = value,
                         ),
                         SizedBox(height: 16),
-                        // Position Dropdown
                         DropdownButtonFormField<String>(
-                          decoration: InputDecoration(
-                            hintText: 'Position',
-                            filled: true,
-                            fillColor: Color(0xFFF6F6F6),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
+                          decoration: _inputDecoration('Position'),
                           items: [
                             DropdownMenuItem(
                               value: 'Forward',
@@ -179,25 +181,18 @@ class _EditTeamMemberScreenState extends State<EditTeamMemberScreen> {
                               _position = value;
                             });
                           },
-                          value: _position,
+                          value: _position ?? widget.playerData['position'],
                         ),
                         SizedBox(height: 16),
-                        // Jersey Number
                         TextFormField(
-                          decoration: InputDecoration(
-                            hintText: 'Jersey Number',
-                            filled: true,
-                            fillColor: Color(0xFFF6F6F6),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
+                          initialValue:
+                              widget.playerData['jerseyNumber']?.toString() ??
+                                  '',
+                          decoration: _inputDecoration('Jersey Number'),
                           keyboardType: TextInputType.number,
                           onSaved: (value) => _jerseyNumber = value,
                         ),
                         SizedBox(height: 32),
-                        // Buttons Row
                         Row(
                           children: [
                             Expanded(
@@ -235,39 +230,98 @@ class _EditTeamMemberScreenState extends State<EditTeamMemberScreen> {
                                   ),
                                   padding: EdgeInsets.symmetric(vertical: 18),
                                 ),
-onPressed: () async {
-  if (_formKey.currentState!.validate()) {
-    _formKey.currentState!.save();
+                                onPressed: () async {
+                                  if (_formKey.currentState!.validate()) {
+                                    _formKey.currentState!.save();
 
-    print("Saving player with docId: ${widget.docId}");
+                                    final memberDocRef = FirebaseFirestore
+                                        .instance
+                                        .collection('teams')
+                                        .doc(widget.teamId)
+                                        .collection('members')
+                                        .doc(widget.docId);
 
-    try {
-      await FirebaseFirestore.instance
-          .collection('teams')
-          .doc('RGvqtnIfLSKNbJflfHpN') // Use your actual team ID dynamically if needed
-          .collection('members')
-          .doc(widget.docId)
-          .update({
-        'firstName': _firstName ?? widget.playerData['firstName'],
-        'lastName': _lastName ?? widget.playerData['lastName'],
-        'age': int.tryParse(_age ?? '') ?? widget.playerData['age'],
-        'position': _position ?? widget.playerData['position'],
-        'jerseyNumber': int.tryParse(_jerseyNumber ?? '') ?? widget.playerData['jerseyNumber'],
-      });
+                                    try {
+                                      final docSnapshot =
+                                          await memberDocRef.get();
+                                      if (docSnapshot.exists) {
+                                        await memberDocRef.update({
+                                          'firstName': _firstName ??
+                                              widget.playerData['firstName'],
+                                          'lastName': _lastName ??
+                                              widget.playerData['lastName'],
+                                          'age': int.tryParse(_age ?? '') ??
+                                              widget.playerData['age'],
+                                          'position': _position ??
+                                              widget.playerData['position'],
+                                          'jerseyNumber':
+                                              int.tryParse(_jerseyNumber ?? '') ??
+                                                  widget
+                                                      .playerData['jerseyNumber'],
+                                          'portraitBase64': _base64Image ??
+                                              widget.playerData['portraitBase64'],
+                                        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Player updated successfully')),
-      );
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                                'Player updated successfully'),
+                                          ),
+                                        );
 
-      Navigator.of(context).pop();
-    } catch (e) {
-      print("Error updating player: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update player: $e')),
-      );
-    }
-  }
-},
+                                        // Refresh the screen
+                                        Navigator.of(context).pushReplacement(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                EditTeamMemberScreen(
+                                              docId: widget.docId,
+                                              teamId: widget.teamId,
+                                              playerData: {
+                                                ...widget.playerData,
+                                                'firstName': _firstName ??
+                                                    widget
+                                                        .playerData['firstName'],
+                                                'lastName': _lastName ??
+                                                    widget
+                                                        .playerData['lastName'],
+                                                'age': int.tryParse(_age ?? '') ??
+                                                    widget.playerData['age'],
+                                                'position': _position ??
+                                                    widget
+                                                        .playerData['position'],
+                                                'jerseyNumber':
+                                                    int.tryParse(
+                                                            _jerseyNumber ?? '') ??
+                                                        widget.playerData[
+                                                            'jerseyNumber'],
+                                                'portraitBase64': _base64Image ??
+                                                    widget.playerData[
+                                                        'portraitBase64'],
+                                              },
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                                'Player not found. Cannot update.'),
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      print("Error updating player: $e");
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                            content: Text(
+                                                'Failed to update player: $e')),
+                                      );
+                                    }
+                                  }
+                                },
                                 child: Text(
                                   'Save',
                                   style: TextStyle(
@@ -281,14 +335,17 @@ onPressed: () async {
                           ],
                         ),
                         SizedBox(height: 16),
-                        // Bottom Navigation (dummy)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            Icon(Icons.home_outlined, color: Colors.grey[400], size: 32),
-                            Icon(Icons.groups, color: Color(0xFFE53935), size: 32),
-                            Icon(Icons.calendar_today_outlined, color: Colors.grey[400], size: 32),
-                            Icon(Icons.chat_bubble_outline, color: Colors.grey[400], size: 32),
+                            Icon(Icons.home_outlined,
+                                color: Colors.grey[400], size: 32),
+                            Icon(Icons.groups,
+                                color: Color(0xFFE53935), size: 32),
+                            Icon(Icons.calendar_today_outlined,
+                                color: Colors.grey[400], size: 32),
+                            Icon(Icons.chat_bubble_outline,
+                                color: Colors.grey[400], size: 32),
                           ],
                         ),
                         SizedBox(height: 8),
@@ -300,6 +357,18 @@ onPressed: () async {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Color(0xFFF6F6F6),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide.none,
       ),
     );
   }

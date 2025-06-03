@@ -5,6 +5,7 @@ import 'EditPlayer.dart';
 import 'Transfer.dart';
 
 class PlayerScreen extends StatelessWidget {
+  final String teamId; // <-- Add this
   final String docId;
   final String name;
   final String role;
@@ -14,6 +15,7 @@ class PlayerScreen extends StatelessWidget {
 
   const PlayerScreen({
     super.key,
+    required this.teamId, // <-- Add this
     required this.docId,
     required this.name,
     required this.role,
@@ -146,7 +148,6 @@ class PlayerScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildBottomNavBar(),
             ],
           ),
         ),
@@ -164,17 +165,18 @@ class PlayerScreen extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         onPressed: () {
-          if (text == "Edit Details") {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => EditTeamMemberScreen(
-                  docId: docId,
-                  playerData: playerData,
-                ),
-              ),
-            );
-          }  else if (text == "Make Transfer") {
+if (text == "Edit Details") {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+builder: (context) => EditTeamMemberScreen(
+  docId: docId,
+  teamId: teamId, // <-- Now use the teamId from the widget
+  playerData: playerData,
+),
+    ),
+  );
+}  else if (text == "Make Transfer") {
   Navigator.push(
     context,
     MaterialPageRoute(

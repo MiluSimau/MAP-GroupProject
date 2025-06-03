@@ -34,7 +34,9 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage> {
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _registerTeam() async {
-    if (_teamNameController.text.trim().isEmpty || _logoBase64 == null) {
+    final teamName = _teamNameController.text.trim();
+
+    if (teamName.isEmpty || _logoBase64 == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Team name and logo are required."),
@@ -47,8 +49,26 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage> {
     setState(() => isLoading = true);
 
     try {
+      // Check for duplicate team name
+      final duplicateQuery = await FirebaseFirestore.instance
+          .collection('teams')
+          .where('name', isEqualTo: teamName)
+          .get();
+
+      if (duplicateQuery.docs.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("A team with this name already exists. Please choose another name."),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => isLoading = false);
+        return;
+      }
+
+      // If no duplicates, proceed to register the team
       await FirebaseFirestore.instance.collection('teams').add({
-        'name': _teamNameController.text.trim(),
+        'name': teamName,
         'logoBase64': _logoBase64!,
         'gender': selectedGender ?? 'Unspecified',
         'region': selectedRegion ?? 'Unknown',

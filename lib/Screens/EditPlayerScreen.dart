@@ -1,324 +1,203 @@
-import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as path;
+// import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:firebase_storage/firebase_storage.dart';
+// import 'package:flutter/material.dart';
+// import 'package:image_picker/image_picker.dart';
+// import 'dart:io';
 
-class EditTeamMemberScreen extends StatefulWidget {
-  final String docId;
-  final Map<String, dynamic> playerData;
+// class EditPlayerScreen extends StatefulWidget {
+//   final String teamId; // 👈 Add this
+//   final String docId;
+//   final String firstName;
+//   final String lastName;
+//   final int age;
+//   final String position;
+//   final int jerseyNumber;
+//   final String imageUrl;
 
-    const EditTeamMemberScreen({
-    Key? key,
-    required this.docId,
-    required this.playerData,
-  }) : super(key: key);
+//   const EditPlayerScreen({
+//     super.key,
+//     required this.teamId, // 👈 Make sure this is required
+//     required this.docId,
+//     required this.firstName,
+//     required this.lastName,
+//     required this.age,
+//     required this.position,
+//     required this.jerseyNumber,
+//     required this.imageUrl,
+//   });
 
+//   @override
+//   _EditPlayerScreenState createState() => _EditPlayerScreenState();
+// }
 
-  @override
-  _EditTeamMemberScreenState createState() => _EditTeamMemberScreenState();
-}
+// class _EditPlayerScreenState extends State<EditPlayerScreen> {
+//   late String _firstName;
+//   late String _lastName;
+//   late String _age;
+//   late String _position;
+//   late String _jerseyNumber;
+//   String? _imageUrl;
+//   File? _selectedImage;
 
-class _EditTeamMemberScreenState extends State<EditTeamMemberScreen> {
-  final _formKey = GlobalKey<FormState>();
-  late String _firstName;
-  late String _lastName;
-  late String _age;
-  late String _position;
-  late String _jerseyNumber;
-  String? _imageUrl;
-  File? _selectedImage;
+//   @override
+//   void initState() {
+//     super.initState();
+//     _firstName = widget.firstName;
+//     _lastName = widget.lastName;
+//     _age = widget.age.toString();
+//     _position = widget.position;
+//     _jerseyNumber = widget.jerseyNumber.toString();
+//     _imageUrl = widget.imageUrl;
+//   }
 
-  @override
-  void initState() {
-    super.initState();
-    _firstName = widget.playerData['firstName'] ?? '';
-    _lastName = widget.playerData['lastName'] ?? '';
-    _age = widget.playerData['age'] ?? '';
-    _position = widget.playerData['position'] ?? '';
-    _jerseyNumber = widget.playerData['jerseyNumber'] ?? '';
-    _imageUrl = widget.playerData['imageUrl'];
-  }
+//   Future<void> _pickImage() async {
+//     final pickedFile =
+//         await ImagePicker().pickImage(source: ImageSource.gallery);
+//     if (pickedFile != null) {
+//       setState(() {
+//         _selectedImage = File(pickedFile.path);
+//       });
+//     }
+//   }
 
-  Future<void> _pickImage() async {
-    final pickedImage =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (pickedImage != null) {
-      setState(() {
-        _selectedImage = File(pickedImage.path);
-      });
-    }
-  }
+//   Future<String?> _uploadImage(File imageFile) async {
+//     try {
+//       final fileName = DateTime.now().millisecondsSinceEpoch.toString();
+//       final storageRef =
+//           FirebaseStorage.instance.ref().child('player_images/$fileName');
+//       await storageRef.putFile(imageFile);
+//       return await storageRef.getDownloadURL();
+//     } catch (e) {
+//       print('Error uploading image: $e');
+//       return null;
+//     }
+//   }
 
-  Future<String?> _uploadImage(File image) async {
-    try {
-      String fileName = path.basename(image.path);
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('player_images')
-          .child('${widget.docId}_$fileName');
+//   Future<void> _updatePlayer() async {
+//     try {
+//       // 1. Validate required fields
+//       if (_firstName.isEmpty ||
+//           _lastName.isEmpty ||
+//           _age.isEmpty ||
+//           _position.isEmpty ||
+//           _jerseyNumber.isEmpty) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(content: Text('Please fill in all required fields.')),
+//         );
+//         return;
+//       }
 
-      await ref.putFile(image);
-      return await ref.getDownloadURL();
-    } catch (e) {
-      print('Image upload error: $e');
-      return null;
-    }
-  }
+//       // 2. Validate and convert age and jersey number
+//       int? parsedAge = int.tryParse(_age);
+//       int? parsedJerseyNumber = int.tryParse(_jerseyNumber);
 
-  Future<void> _updatePlayer() async {
-    try {
-      String? imageUrl = _imageUrl;
+//       if (parsedAge == null || parsedJerseyNumber == null) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(
+//               content: Text(
+//                   'Please enter valid numbers for age and jersey number.')),
+//         );
+//         return;
+//       }
 
-      if (_selectedImage != null) {
-        imageUrl = await _uploadImage(_selectedImage!);
-      }
+//       // 3. Handle image upload if a new image is selected
+//       String? imageUrl = _imageUrl;
+//       if (_selectedImage != null) {
+//         final uploadedUrl = await _uploadImage(_selectedImage!);
+//         if (uploadedUrl != null) {
+//           imageUrl = uploadedUrl;
+//         } else {
+//           throw Exception('Image upload failed.');
+//         }
+//       }
 
-      await FirebaseFirestore.instance
-          .collection('players')
-          .doc(widget.docId)
-          .update({
-        'firstName': _firstName,
-        'lastName': _lastName,
-        'age': _age,
-        'position': _position,
-        'jerseyNumber': _jerseyNumber,
-        'imageUrl': imageUrl,
-      });
+//       // 4. Update Firestore
+// await FirebaseFirestore.instance
+//     .collection('teams')
+//     .doc(widget.teamId) // 👈 Access teamId via widget.teamId
+//     .collection('members')
+//     .doc(widget.docId)
+//     .update({
+//   'firstName': _firstName,
+//   'lastName': _lastName,
+//   'age': parsedAge,
+//   'position': _position,
+//   'jerseyNumber': parsedJerseyNumber,
+//   'imageUrl': imageUrl,
+// });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Player updated successfully')),
-      );
-      Navigator.pop(context);
-    } catch (e) {
-      print('Error updating player: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update player')),
-      );
-    }
-  }
+//       // 5. Notify success
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text('Player updated successfully!')),
+//       );
 
-  Future<void> _deletePlayer() async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('players')
-          .doc(widget.docId)
-          .delete();
+//       // 6. Close the screen
+//       Navigator.pop(context);
+//     } catch (e) {
+//       print('Error updating player: $e');
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text('Failed to update player: $e')),
+//       );
+//     }
+//   }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Player deleted')),
-      );
-      Navigator.pop(context);
-    } catch (e) {
-      print('Error deleting player: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete player')),
-      );
-    }
-  }
-
-  Widget _buildPlayerPortrait() {
-    return GestureDetector(
-      onTap: _pickImage,
-      child: Container(
-        width: 100,
-        height: 100,
-        decoration: BoxDecoration(
-          color: Color(0xFFF6F6F6),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: _selectedImage != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.file(_selectedImage!, fit: BoxFit.cover),
-              )
-            : _imageUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(_imageUrl!, fit: BoxFit.cover),
-                  )
-                : Center(
-                    child: Icon(
-                      Icons.add_photo_alternate_outlined,
-                      color: Colors.grey[400],
-                      size: 40,
-                    ),
-                  ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(0xFFF8F8F8),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            child: Container(
-              width: 370,
-              padding: EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 24,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: CircleAvatar(
-                      backgroundColor: Color(0xFFE53935),
-                      radius: 24,
-                      child: IconButton(
-                        icon: Icon(Icons.arrow_back, color: Colors.white),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Player Portrait',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-                  ),
-                  SizedBox(height: 12),
-                  _buildPlayerPortrait(),
-                  SizedBox(height: 24),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          initialValue: _firstName,
-                          decoration: _inputDecoration('First Name'),
-                          onSaved: (value) => _firstName = value!,
-                        ),
-                        SizedBox(height: 16),
-                        TextFormField(
-                          initialValue: _lastName,
-                          decoration: _inputDecoration('Last Name'),
-                          onSaved: (value) => _lastName = value!,
-                        ),
-                        SizedBox(height: 16),
-                        TextFormField(
-                          initialValue: _age,
-                          decoration: _inputDecoration('Age'),
-                          keyboardType: TextInputType.number,
-                          onSaved: (value) => _age = value!,
-                        ),
-                        SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          decoration: _inputDecoration('Position'),
-                          value: _position.isNotEmpty ? _position : null,
-                          items: ['Forward', 'Midfielder', 'Defender', 'Goalkeeper']
-                              .map((pos) => DropdownMenuItem(
-                                    value: pos,
-                                    child: Text(pos),
-                                  ))
-                              .toList(),
-                          onChanged: (value) =>
-                              setState(() => _position = value!),
-                        ),
-                        SizedBox(height: 16),
-                        TextFormField(
-                          initialValue: _jerseyNumber,
-                          decoration: _inputDecoration('Jersey Number'),
-                          keyboardType: TextInputType.number,
-                          onSaved: (value) => _jerseyNumber = value!,
-                        ),
-                        SizedBox(height: 32),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                      color: Color(0xFFE53935), width: 2),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10)),
-                                  padding: EdgeInsets.symmetric(vertical: 18),
-                                ),
-                                onPressed: _deletePlayer,
-                                child: Text(
-                                  'Delete',
-                                  style: TextStyle(
-                                      color: Color(0xFFE53935),
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16),
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 16),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFFE53935),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10)),
-                                  padding: EdgeInsets.symmetric(vertical: 18),
-                                ),
-                                onPressed: () {
-                                  if (_formKey.currentState!.validate()) {
-                                    _formKey.currentState!.save();
-                                    _updatePlayer();
-                                  }
-                                },
-                                child: Text(
-                                  'Save',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            Icon(Icons.home_outlined,
-                                color: Colors.grey[400], size: 32),
-                            Icon(Icons.groups,
-                                color: Color(0xFFE53935), size: 32),
-                            Icon(Icons.calendar_today_outlined,
-                                color: Colors.grey[400], size: 32),
-                            Icon(Icons.chat_bubble_outline,
-                                color: Colors.grey[400], size: 32),
-                          ],
-                        ),
-                        SizedBox(height: 8),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String hintText) {
-    return InputDecoration(
-      hintText: hintText,
-      filled: true,
-      fillColor: Color(0xFFF6F6F6),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: Text('Edit Player'),
+//       ),
+//       body: SingleChildScrollView(
+//         padding: EdgeInsets.all(16),
+//         child: Column(
+//           children: [
+//             GestureDetector(
+//               onTap: _pickImage,
+//               child: CircleAvatar(
+//                 radius: 60,
+//                 backgroundImage: _selectedImage != null
+//                     ? FileImage(_selectedImage!)
+//                     : (_imageUrl != null && _imageUrl!.isNotEmpty)
+//                         ? NetworkImage(_imageUrl!) as ImageProvider
+//                         : AssetImage('assets/default_avatar.png'),
+//               ),
+//             ),
+//             SizedBox(height: 16),
+//             TextField(
+//               decoration: InputDecoration(labelText: 'First Name'),
+//               onChanged: (value) => _firstName = value,
+//               controller: TextEditingController(text: _firstName),
+//             ),
+//             TextField(
+//               decoration: InputDecoration(labelText: 'Last Name'),
+//               onChanged: (value) => _lastName = value,
+//               controller: TextEditingController(text: _lastName),
+//             ),
+//             TextField(
+//               decoration: InputDecoration(labelText: 'Age'),
+//               keyboardType: TextInputType.number,
+//               onChanged: (value) => _age = value,
+//               controller: TextEditingController(text: _age),
+//             ),
+//             TextField(
+//               decoration: InputDecoration(labelText: 'Position'),
+//               onChanged: (value) => _position = value,
+//               controller: TextEditingController(text: _position),
+//             ),
+//             TextField(
+//               decoration: InputDecoration(labelText: 'Jersey Number'),
+//               keyboardType: TextInputType.number,
+//               onChanged: (value) => _jerseyNumber = value,
+//               controller: TextEditingController(text: _jerseyNumber),
+//             ),
+//             SizedBox(height: 20),
+//             ElevatedButton(
+//               onPressed: _updatePlayer,
+//               child: Text('Update Player'),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }

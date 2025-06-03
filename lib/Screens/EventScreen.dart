@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'EventRegistration.dart';
-import '../models/event_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'EventRegistration.dart'; // your event creation screen
 
 class Event {
-  final String imageUrl;
+  final ImageProvider imageProvider;
   final String title;
   final String date;
   final String location;
 
   Event({
-    required this.imageUrl,
+    required this.imageProvider,
     required this.title,
     required this.date,
     required this.location,
@@ -27,18 +27,23 @@ class EventsScreen extends StatefulWidget {
 class _EventsScreenState extends State<EventsScreen> {
   List<Event> events = [
     Event(
-      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/6/6b/Tree_icon.png',
+      imageProvider: NetworkImage(
+          'https://upload.wikimedia.org/wikipedia/commons/6/6b/Tree_icon.png'),
       title: 'FNB Classic Clash',
       date: '3-7 Jun',
       location: 'Windhoek',
     ),
     Event(
-      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Field_hockey_icon_2.png',
+      imageProvider: NetworkImage(
+          'https://upload.wikimedia.org/wikipedia/commons/3/3e/Field_hockey_icon_2.png'),
       title: 'Ladies 7-a-side Tournament',
       date: '8 Jun',
       location: 'Windhoek',
     ),
   ];
+
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
 
   void _navigateToCreateEvent() async {
     final newEvent = await Navigator.push(
@@ -53,14 +58,181 @@ class _EventsScreenState extends State<EventsScreen> {
     }
   }
 
+  void _navigateToCreateFixture() {
+    // TODO: Implement fixture creation screen navigation
+    // Example:
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(builder: (context) => FixtureCreationScreen()),
+    // );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Fixture creation screen not implemented yet.')),
+    );
+  }
+
+  void _updateScore(
+      String eventId, String scoreField, int newScore, BuildContext context) {
+    FirebaseFirestore.instance
+        .collection('events')
+        .doc(eventId)
+        .update({scoreField: newScore}).catchError((error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update score: $error')),
+      );
+    });
+  }
+
+  void _showEventDetails(BuildContext context, Map<String, dynamic> data,
+      ImageProvider imageProvider, String eventId) {
+    final teamA = data['teamA'] ?? 'Team A';
+    final teamB = data['teamB'] ?? 'Team B';
+    int scoreTeamA = data['scoreTeamA'] ?? 0;
+    int scoreTeamB = data['scoreTeamB'] ?? 0;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          return Padding(
+            padding:
+                EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              child: Wrap(
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                          color: Colors.grey[400],
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundImage: imageProvider,
+                        radius: 32,
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              data['name'] ?? 'Untitled Event',
+                              style: const TextStyle(
+                                  fontSize: 20, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${data['startTime'] ?? ''} | ${data['location'] ?? ''}',
+                              style: TextStyle(color: Colors.grey[700]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 30, thickness: 1.5),
+                  Text(
+                    'Live Score',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red[700]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildScoreColumn(
+                          teamA, scoreTeamA, eventId, 'scoreTeamA', context,
+                          setState),
+                      Container(
+                        width: 1,
+                        height: 60,
+                        color: Colors.grey[300],
+                      ),
+                      _buildScoreColumn(
+                          teamB, scoreTeamB, eventId, 'scoreTeamB', context,
+                          setState),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14)),
+                    child: const Center(
+                      child: Text('Close', style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  Widget _buildScoreColumn(String team, int score, String eventId,
+      String scoreField, BuildContext context, Function setState) {
+    return Column(
+      children: [
+        Text(team,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+              onPressed: score > 0
+                  ? () {
+                      setState(() {
+                        score--;
+                      });
+                      _updateScore(eventId, scoreField, score, context);
+                    }
+                  : null,
+            ),
+            Text(
+              '$score',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+              onPressed: () {
+                setState(() {
+                  score++;
+                });
+                _updateScore(eventId, scoreField, score, context);
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF8F8F8),
+      backgroundColor: const Color(0xFFF8F8F8),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Text(
+        title: const Text(
           'Events Screen',
           style: TextStyle(
             color: Colors.black,
@@ -77,7 +249,7 @@ class _EventsScreenState extends State<EventsScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(
                 color: Colors.black12,
                 blurRadius: 8,
@@ -87,134 +259,113 @@ class _EventsScreenState extends State<EventsScreen> {
           ),
           child: ListView(
             children: [
-              SizedBox(height: 18),
-              Align(alignment: Alignment.centerLeft),
-              SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              const SizedBox(height: 18),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
                 child: Text(
-                  'Calender',
+                  'Calendar',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
                 ),
               ),
-              SizedBox(height: 12),
-              CalendarWidget(),
-              SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              const SizedBox(height: 12),
+              _buildCalendar(),
+              const SizedBox(height: 12),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
                 child: Text(
                   'Events',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 ),
               ),
-              SizedBox(height: 8),
-...events.map((event) => EventCard(
-  imageUrl: event.imageUrl,
-  title: event.title,
-  date: event.date,
-  location: event.location,
-)),
-
-SizedBox(height: 12),
-
-Padding(
-  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-  child: Text(
-    'Live Events',
-    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-  ),
-),
-
-FirestoreEventList(),
-              SizedBox(height: 60),
+              const SizedBox(height: 8),
+              ...events.map((event) => EventCard(
+                    imageProvider: event.imageProvider,
+                    title: event.title,
+                    date: event.date,
+                    location: event.location,
+                  )),
+              const SizedBox(height: 12),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  'Live Events',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ),
+              const SizedBox(height: 8),
+              FirestoreEventList(
+                onEventTap: (doc, data, imageProvider) {
+                  _showEventDetails(context, data, imageProvider, doc.id);
+                },
+              ),
+              const SizedBox(height: 60),
             ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _navigateToCreateEvent,
-        backgroundColor: Colors.red,
-        child: Icon(Icons.add, size: 36),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+floatingActionButton: Row(
+  mainAxisAlignment: MainAxisAlignment.end,
+  children: [
+    FloatingActionButton.extended(
+      onPressed: _navigateToCreateEvent,
+      backgroundColor: Colors.green,
+      icon: const Icon(Icons.event),
+      label: const Text('Create Event'),
+      heroTag: 'createEventFAB',
+    ),
+    const SizedBox(width: 16),
+    FloatingActionButton.extended(
+      onPressed: _navigateToCreateFixture,
+      backgroundColor: Colors.orange,
+      icon: const Icon(Icons.sports_soccer),
+      label: const Text('Create Fixture'),
+      heroTag: 'createFixtureFAB',
+    ),
+  ],
+),
+floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
-}
 
-class CalendarWidget extends StatelessWidget {
-  const CalendarWidget({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 8),
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(12),
+  Widget _buildCalendar() {
+    return TableCalendar(
+      firstDay: DateTime.utc(2020, 1, 1),
+      lastDay: DateTime.utc(2030, 12, 31),
+      focusedDay: _focusedDay,
+      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+      onDaySelected: (selectedDay, focusedDay) {
+        setState(() {
+          _selectedDay = selectedDay;
+          _focusedDay = focusedDay;
+        });
+      },
+      calendarStyle: const CalendarStyle(
+        todayDecoration: BoxDecoration(
+          color: Colors.redAccent,
+          shape: BoxShape.circle,
+        ),
+        selectedDecoration: BoxDecoration(
+          color: Colors.green,
+          shape: BoxShape.circle,
+        ),
       ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(Icons.chevron_left, color: Colors.grey),
-              Text('May 2025', style: TextStyle(fontWeight: FontWeight.bold)),
-              Icon(Icons.chevron_right, color: Colors.grey),
-            ],
-          ),
-          SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-                .map((d) => Expanded(
-                      child: Center(
-                        child: Text(
-                          d,
-                          style:
-                              TextStyle(fontSize: 12, color: Colors.grey[700]),
-                        ),
-                      ),
-                    ))
-                .toList(),
-          ),
-          SizedBox(height: 4),
-          ...List.generate(
-            5,
-            (week) => Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(7, (day) {
-                int date = week * 7 + day - 2;
-                bool isToday = (date == 15);
-                return Expanded(
-                  child: Center(
-                    child: Text(
-                      date > 0 && date <= 31 ? '$date' : '',
-                      style: TextStyle(
-                        fontWeight:
-                            isToday ? FontWeight.bold : FontWeight.normal,
-                        color: isToday ? Colors.red : Colors.black,
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
-        ],
+      headerStyle: const HeaderStyle(
+        formatButtonVisible: false,
+        titleCentered: true,
       ),
     );
   }
 }
 
 class EventCard extends StatelessWidget {
-  final String imageUrl;
+  final ImageProvider imageProvider;
   final String title;
   final String date;
   final String location;
 
-  const EventCard({super.key, 
-    required this.imageUrl,
+  const EventCard({
+    super.key,
+    required this.imageProvider,
     required this.title,
     required this.date,
     required this.location,
@@ -222,72 +373,51 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-      padding: EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundImage: NetworkImage(imageUrl),
-            radius: 24,
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: TextStyle(fontWeight: FontWeight.w600)),
-                SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                    SizedBox(width: 4),
-                    Text(date, style: TextStyle(color: Colors.grey[700])),
-                    SizedBox(width: 8),
-                    Text(location, style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right, color: Colors.grey),
-        ],
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListTile(
+        leading: CircleAvatar(backgroundImage: imageProvider),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text('$date • $location'),
       ),
     );
   }
 }
+
 class FirestoreEventList extends StatelessWidget {
-  const FirestoreEventList({super.key});
+  final Function(DocumentSnapshot, Map<String, dynamic>, ImageProvider)
+      onEventTap;
+
+  const FirestoreEventList({super.key, required this.onEventTap});
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('events')
-          .orderBy('timestamp', descending: true) // optional ordering
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('events').snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Center(child: Text('Error loading events'));
+        }
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(child: Text("No Firestore events yet."));
+        final docs = snapshot.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return const Center(child: Text('No live events found.'));
         }
-
         return Column(
-          children: snapshot.data!.docs.map((doc) {
+          children: docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
-
-            return EventCard(
-              imageUrl: data['imageUrl'] ?? '',
-              title: data['name'] ?? 'Untitled Event',
-              date: data['startTime'] ?? '',
-              location: data['location'] ?? 'Unknown',
+            final imageProvider = NetworkImage(data['imageUrl'] ??
+                'https://upload.wikimedia.org/wikipedia/commons/6/6b/Tree_icon.png');
+            return GestureDetector(
+              onTap: () => onEventTap(doc, data, imageProvider),
+              child: EventCard(
+                imageProvider: imageProvider,
+                title: data['name'] ?? 'Untitled Event',
+                date: data['startTime'] ?? '',
+                location: data['location'] ?? '',
+              ),
             );
           }).toList(),
         );

@@ -2,9 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'teamsPage.dart';
-import 'EventScreen.dart';
-import 'Announcement.dart';
+import '../Screens/EventScreen.dart';
+import '../Screens/Announcement.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -380,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         },
         children: [
           _buildMainHomeContent(),
-          TeamsPage(),
+          
           EventsScreen(),
           AnnouncementScreen(),
         ],

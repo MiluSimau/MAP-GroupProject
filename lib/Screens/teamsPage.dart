@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'TeamRegistrationPage.dart';
-import 'teamBackground.dart'; // Make sure this file exists
+import 'teamBackground.dart';
 import 'dart:convert';
 
-
-class TeamsPage extends StatelessWidget {
+class TeamsPage extends StatefulWidget {
   const TeamsPage({super.key});
+
+  @override
+  State<TeamsPage> createState() => _TeamsPageState();
+}
+
+class _TeamsPageState extends State<TeamsPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +40,12 @@ class TeamsPage extends StatelessWidget {
                   ),
                   SizedBox(height: 16),
                   TextField(
+                    controller: _searchController,
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value.toLowerCase();
+                      });
+                    },
                     decoration: InputDecoration(
                       hintText: 'Search for team...',
                       prefixIcon: Icon(Icons.search, color: Colors.redAccent),
@@ -49,7 +68,11 @@ class TeamsPage extends StatelessWidget {
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
 
-                  final teams = snapshot.data!.docs;
+                  // Filter based on search query
+                  final teams = snapshot.data!.docs.where((doc) {
+                    final name = (doc['name'] ?? '').toString().toLowerCase();
+                    return name.contains(_searchQuery);
+                  }).toList();
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -81,16 +104,16 @@ class TeamsPage extends StatelessWidget {
 
                         return GestureDetector(
                           onTap: () {
-Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => TeamPage(
-      teamName: name,
-      teamLogo: imageProvider,
-      teamId: team.id, 
-    ),
-  ),
-);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TeamPage(
+                                  teamName: name,
+                                  teamLogo: imageProvider,
+                                  teamId: team.id,
+                                ),
+                              ),
+                            );
                           },
                           child: Card(
                             elevation: 0,
@@ -137,7 +160,7 @@ Navigator.push(
           );
         },
         backgroundColor: Colors.redAccent,
-        child: Icon(Icons.add, size: 32),
+        child: Icon(Icons.add, size: 32, color: Colors.white),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );

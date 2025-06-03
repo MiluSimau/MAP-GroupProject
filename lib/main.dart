@@ -5,6 +5,7 @@ import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'screens/Welcome.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +25,8 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(primarySwatch: Colors.green),
       initialRoute: '/',
       routes: {
-        '/': (context) => SplashScreen(),
+        '/': (context) => WelcomePage(),
+        '/welcome': (context) => WelcomePage(),
         '/login': (context) => LoginScreen(),
         '/signup': (context) => SignupScreen(),
         '/home': (context) => HomeScreen(),
